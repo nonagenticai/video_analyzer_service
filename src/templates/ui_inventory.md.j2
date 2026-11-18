@@ -1,0 +1,17 @@
+# UI Inventory: {{ title | default("Video Analysis") }}
+
+{% if ui_elements %}
+{% for element in ui_elements %}
+## {{ element.label }}
+
+- **First seen:** {{ "%.1f" | format(element.first_seen) }}s
+{% if element.ocr_text %}
+- **OCR text:** {{ element.ocr_text }}
+{% endif %}
+{% if element.description %}
+- **Description:** {{ element.description }}
+{% endif %}
+{% endfor %}
+{% else %}
+_No UI elements extracted._
+{% endif %}

@@ -1,0 +1,176 @@
+[project]
+license = "Apache-2.0"
+name = "video-analyzer-service"
+version = "0.1.0"
+description = "CPU-side video analysis orchestrator: frame extraction, OCR, vision LLM, verification"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.118",
+    "uvicorn[standard]>=0.34",
+    "pydantic>=2.11",
+    "pydantic-settings>=2.14.2",  # GHSA-4xgf-cpjx-pc3j fixed in 2.14.2
+    "sqlalchemy[asyncio]>=2.0.36",
+    "psycopg[binary,pool]>=3.3",
+    "alembic>=1.14",
+    "redis>=5.2",
+    "httpx[http2]>=0.28",
+    "jinja2>=3.1.6",
+    "pillow>=13.0.0",
+    "numpy>=2.0",
+    "opencv-python-headless>=4.10",
+    "pytesseract>=0.3.13",
+    "yt-dlp>=2026.7.4",
+    "imagehash>=4.3",
+    "python-multipart>=0.0.27",
+    "miniopy-async>=1.23.0",
+    "w2v-common>=0.113.0",  # 0.113: providers (run provider slots: asr/vlm/llm); 0.104 attribution/entitlement
+    # Beat/onset detection for the cut-to-the-music product type
+    # (src/services/beat_detector.py, POST /api/analyze/audio). Nothing else in
+    # the fleet can find a beat, so this is the one place the capability lives.
+    # NOTE: audio is decoded by **ffmpeg** into a numpy array and handed to
+    # librosa as samples — `librosa.load` is never called, so `soundfile` /
+    # `libsndfile` is never imported and does not have to exist in the image.
+    # That matters: libsndfile is a system C library whose mp3/m4a support
+    # varies by build, whereas ffmpeg is already a hard requirement here.
+    # librosa pulls numba, which JIT-compiles on first use (~9.7s); the app
+    # warms it at startup (see src/asgi.py -> beat_detector.warm_up).
+    "librosa>=0.11",
+    # --- Security floors on transitive dependencies ---
+    # Neither package is imported by this service directly; both arrive as
+    # transitives (aiohttp via miniopy-async, cryptography via pyjwt and
+    # w2v-common). The lock was already moved to safe versions fleet-wide, but
+    # a lock is a point-in-time resolution: the next unrelated `uv lock` is
+    # free to walk an undeclared transitive back DOWN, silently, with green CI.
+    # The declared floor is the only thing that binds it. Regression-tested by
+    # tests/unit/test_security_floors.py. Precedent: analysis_service #175/#176.
+    #
+    # aiohttp 3.14.1 was flagged by CVE-2026-59881 + CVE-2026-69243 (fixed in
+    # 3.14.2) and CVE-2026-69244 (fixed in 3.14.3); 3.14.3 was then flagged by
+    # CVE-2026-111063 + CVE-2026-111064 + GHSA-2g87-pp6c-29x5 (fixed in 3.14.4).
+    "aiohttp>=3.14.4",
+    # cryptography: CVE-2026-69247 (GHSA-g6cj-pr64-35w5) was introduced in
+    # 44.0.0 and fixed in 50.0.0, so the previously-locked 49.0.0 was affected.
+    "cryptography>=50.0.0",
+    # h2: CVE-2026-71554 affects 4.3.0 and is fixed in 4.4.1. It arrives as a
+    # transitive of the `httpx[http2]` extra declared above.
+    "h2>=4.4.1",
+]
+
+[project.scripts]
+video-analyzer-service = "src.asgi:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.0",
+    "pytest-asyncio>=1.3.0",
+    "pytest-cov>=7.0.0",
+    "pytest-timeout>=2.4.0",
+    "httpx>=0.28",
+    "respx>=0.22",
+    "ruff>=0.15.0",
+    "ty>=0.0.23",
+    "fakeredis>=2.34.0",
+    "pip-audit>=2.10.0",
+    # pip is a transitive dep of pip-audit (pip-audit -> pip-api -> pip).
+    # Explicit floor: pip < 26.2 is vulnerable to PYSEC-2026-3721.
+    "pip>=26.2",
+    "detect-secrets>=1.5.0",
+    "bandit>=1.9.4",
+]
+
+[tool.uv]
+override-dependencies = [
+    # miniopy-async (1.23.5, the LATEST) caps the CA-certificate bundle:
+    #   certifi>=2025.1.31,<2026.0.0
+    # That is lazy upper-bounding, not a real incompatibility -- certifi's entire
+    # public API is where()/contents() and has been stable for years, while the
+    # package's whole purpose is to ship CURRENT roots. Left alone the cap pins
+    # every MinIO-using repo in this fleet to a trust store from Nov 2025, and no
+    # relock cadence can move it (verified by making uv name the constraint).
+    #
+    # NOT overriding miniopy-async's argon2-cffi<24.0.0 alongside it: that is a
+    # MAJOR bump with real API surface, so it needs its own testing rather than
+    # riding along with a data-only package.
+    "certifi>=2026.7.22",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "I", "N", "W", "UP", "ANN", "B", "BLE", "A", "S", "C901",
+    "RUF", "RET", "SIM", "ASYNC", "PTH", "TID251",
+]
+ignore = [
+    "E501",
+    "B008",
+    "ASYNC240",
+    "ASYNC109"
+]
+
+# uuid7 is the id standard (stdlib, py3.14). TID251 bans `uuid4` in production
+# code via ruff — enforced in CI (`ruff check .`), not only local pre-commit.
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"uuid.uuid4".msg = "uuid7 is the w2v id standard — use uuid.uuid7() (stdlib, py3.14)."
+
+[tool.ruff.lint.per-file-ignores]
+"src/database/migrations/*" = ["I001", "ANN"]
+"tests/**/*.py" = ["S101", "S104", "S105", "S106", "S107", "S108", "ANN", "PTH", "ASYNC110", "ASYNC230", "ASYNC240", "SIM115", "SIM117", "TID251"]
+
+# ── ANN401 ratchet (see [tool.ruff.lint].ignore note) ─────────────────────────
+# EMPTY, and it stays empty: as of 2026-09-05 no file in `src/` carries a bare
+# `Any` in a signature, so ANN401 is enforced everywhere. Do NOT add a line here
+# to unblock a PR — give the value a real type instead.
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "unit: unit tests",
+    "integration: integration tests",
+]
+
+[tool.coverage.run]
+omit = [
+    "src/database/migrations/*",
+    "src/asgi.py",
+]
+
+[tool.coverage.report]
+fail_under = 95
+
+[tool.bandit]
+targets = ["src"]
+skips = ["B311"]
+
+[tool.ty.environment]
+python-version = "3.14"
+
+[tool.ty.rules]
+import-not-found = "error"
+unresolved-reference = "error"
+missing-attribute = "error"
+possibly-unresolved-reference = "error"
+possibly-missing-attribute = "error"
+missing-argument = "error"
+invalid-argument-type = "error"
+invalid-explicit-return = "error"
+
+[tool.uv.sources]
+# The published source tree resolves its shared library from the public
+# repository at the release tag; the private index is not reachable here.
+w2v-common = { git = "https://github.com/nonagenticai/w2v_common", tag = "v0.115.4" }

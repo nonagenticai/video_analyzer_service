@@ -1,0 +1,28 @@
+# Verification Report
+
+**Result:** {% if result.passed %}PASSED{% else %}FAILED{% endif %}
+**Criteria:** {{ result.criteria_passed }} / {{ result.criteria_total }} passed
+
+{% if result.transcript_similarity is not none %}
+**Transcript similarity:** {{ "%.3f" | format(result.transcript_similarity) }}
+{% endif %}
+
+{% if result.failures %}
+## Failures
+
+| Criterion | Expected | Actual | Evidence |
+|-----------|----------|--------|----------|
+{% for failure in result.failures %}
+| {{ failure.criterion }} | {{ failure.expected | default("-") }} | {{ failure.actual | default("-") }} | {{ failure.evidence | default("-") }} |
+{% endfor %}
+{% endif %}
+
+{% if result.screenshot_matches %}
+## Screenshot matches
+
+| Name | Matched frame | Timestamp | Hamming distance |
+|------|---------------|-----------|------------------|
+{% for match in result.screenshot_matches %}
+| {{ match.name }} | {{ match.matched_frame | default("-") }} | {% if match.timestamp is not none %}{{ "%.2f" | format(match.timestamp) }}s{% else %}-{% endif %} | {{ match.distance }} |
+{% endfor %}
+{% endif %}

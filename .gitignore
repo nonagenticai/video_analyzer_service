@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+.uv-cache/
+.python-version
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Runtime data
+data/
+
+# OS
+.DS_Store
+Thumbs.db
+test-results/
+
+# Developer-local CI failure snapshots written by ad-hoc tooling.
+0*_recent_push_failure.txt
+
+# Sibling agent sessions use `git worktree add .worktrees/<slug>` (the hot-repo
+# convention in the parent CLAUDE.md). Untracked, these show up as embedded git
+# repositories, so a `git add -A` stages ANOTHER session's worktree gitlinks into
+# your commit — observed 2026-08-04, three of them plus an unrelated README edit.
+# 7 of the 19 w2v repos already ignore this; the rest inherit the hazard.
+.worktrees/

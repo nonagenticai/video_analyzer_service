@@ -1,0 +1,7 @@
+# Frame Index: {{ title | default("Video Analysis") }}
+
+| # | Timestamp | Description | OCR |
+|---|-----------|-------------|-----|
+{% for frame in frames -%}
+| {{ frame.index }} | {{ "%.2f" | format(frame.timestamp) }}s | {{ frame.description or "-" }} | {{ frame.ocr_text or "-" }} |
+{% endfor -%}

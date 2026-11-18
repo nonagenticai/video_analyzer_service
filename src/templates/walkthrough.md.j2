@@ -1,0 +1,28 @@
+# Walkthrough: {{ title | default("Video Analysis") }}
+
+**Duration:** {{ "%.1f" | format(duration_seconds) }}s
+**Resolution:** {{ width }}x{{ height }}
+
+## Summary
+
+{{ synthesis | default("No synthesis available.") }}
+
+## Scenes
+
+{% if scenes %}
+{% for scene in scenes %}
+### Scene {{ loop.index }} — {{ "%.1f" | format(scene.start) }}s → {{ "%.1f" | format(scene.end) }}s
+
+{{ scene.description | default("(no description)") }}
+{% endfor %}
+{% else %}
+_No scene boundaries detected._
+{% endif %}
+
+## Transcript
+
+{% if transcript %}
+{{ transcript }}
+{% else %}
+_No transcript available._
+{% endif %}
